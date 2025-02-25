@@ -1,10 +1,10 @@
 import { db } from "./firebase"
-import { getFirestore, doc, onSnapshot, updateDoc } from "firebase/firestore"
+import { doc, onSnapshot, updateDoc } from "firebase/firestore"
 import { ref, set } from "firebase/database"  
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
 import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
-import { Lightbulb, LightbulbOff } from "lucide-react"
+import { Lightbulb } from "lucide-react"
 
 function App() {
   const [isOn, setIsOn] = useState(false)
