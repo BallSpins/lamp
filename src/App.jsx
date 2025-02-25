@@ -1,107 +1,125 @@
+import { db } from "./firebase"
+import { getFirestore, doc, onSnapshot, updateDoc } from "firebase/firestore"
+import { ref, set } from "firebase/database"  
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
 import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Lightbulb, LightbulbOff } from "lucide-react"
-import mqtt from "mqtt" // Import MQTT
-
-const MQTT_BROKER = process.env.REACT_APP_MQTT_BROKER
-const MQTT_OPTIONS = {
-  username: process.env.REACT_APP_MQTT_USERNAME,
-  password: process.env.REACT_APP_MQTT_PASSWORD,
-  connectTimeout: 5000,
-  clientId: "react-client-" + Math.random().toString(16).substring(2, 8),
-}
 
 function App() {
   const [isOn, setIsOn] = useState(false)
   const [show, setShow] = useState(false)
-  const [mqttClient, setMqttClient] = useState(null)
-  const [schedule, setSchedule] = useState({ on: "", off: "" })
   const [autoMode, setAutoMode] = useState(false)
+  const [ scheduleMode, setScheduleMode ] = useState(false)
+  const [schedule, setSchedule] = useState({ on: "", off: "" })
   const [sunTimes, setSunTimes] = useState({ sunrise: "", sunset: "" })
-  const prevState = useRef(null)
+  const prevAutoMode = useRef(autoMode)
+  const prevScheduleMode = useRef(scheduleMode)
 
   useEffect(() => {
-    const client = mqtt.connect(MQTT_BROKER, MQTT_OPTIONS)
-    client.on("connect", () => console.log("MQTT Connected"))
-    client.on("error", (err) => console.error("MQTT Error: ", err))
+    const auth = getAuth()
+    
+    signInWithEmailAndPassword(auth, "okgasokgasayokitacarigas@gmail.com", "okgasokgas")
+      .then(async (userCredential) => {
+        console.log("User logged in:", userCredential.user)
 
-    setMqttClient(client)
+        const unsub = (async () => {
+          const docRef = doc(db, 'schedule', 'global')
+  
+          onSnapshot(docRef, (doc) => {
+            let data = doc.data()
+  
+            console.log('Current data: ', data)
+  
+            setIsOn(data['lampStatus'])
+            setAutoMode(data['autoSchedule']['status'])
+            setScheduleMode(data['schedule']['status'])
+            setSchedule({ on: data['schedule']['on'], off: data['schedule']['off'] })
+          })
+        })()
+      })
+      .catch((error) => {
+        console.error("Login failed:", error.message);
+      })
 
-    return () => {
-      client.end()
-    }
-  }, [])
+    }, [])
 
-  const publishMessage = (message) => {
-    if (mqttClient?.connected) {
-      mqttClient.publish("lamp/control", message)
-      console.log(`MQTT Published: ${message}`)
-    } else {
-      console.error("MQTT Not Connected")
+  const store = async (section) => {
+    const docRef = doc(db, 'schedule', 'global')
+    switch (section) {
+      case 1:
+        await updateDoc(docRef, {
+          lampStatus: isOn
+        })
+        break;
+      case 2:
+        console.log('suntime ', sunTimes)
+        await updateDoc(docRef, {
+          autoSchedule: {
+            status: autoMode,
+            sunrise: sunTimes['sunrise'],
+            sunset: sunTimes['sunset']
+          }
+        })
+        break;
+      case 3:
+        await updateDoc(docRef, {
+          schedule: {
+            status: scheduleMode,
+            on: schedule['on'],
+            off: schedule['off']
+          }
+        })
+        break;
+      default:
+        set(ref(db, 'schedule/global'), {
+          lampStatus: isOn
+        })
+        break;
     }
   }
 
   // Fetch sunrise & sunset every 30 seconds
-  // useEffect(() => {
-  //   const fetchSunTimes = async () => {
-  //     const res = await fetch(
-  //       "https://api.sunrise-sunset.org/json?lat=-7.250445&lng=112.768845&formatted=0"
-  //     )
-  //     const data = await res.json()
-  //     if (data.status === "OK") {
-  //       const sunrise = new Date(data.results.sunrise).toLocaleTimeString("en-GB", { 
-  //         timeZone: "Asia/Jakarta",
-  //         hour: "2-digit",
-  //         minute: "2-digit",
-  //       })
-  //       const sunset = new Date(data.results.sunset).toLocaleTimeString("en-GB", { 
-  //         timeZone: "Asia/Jakarta",
-  //         hour: "2-digit",
-  //         minute: "2-digit",
-  //       })
-  //       console.log({ sunrise, sunset })
-  //       setSunTimes({ sunrise, sunset })
-  //     }
-  //   }
-  //   fetchSunTimes()
-  //   const interval = setInterval(fetchSunTimes, 30000)
-  //   return () => clearInterval(interval)
-  // }, [])
-
-  // Check time every second
   useEffect(() => {
-    const checkTime = () => {
-      const currentTime = new Date().toLocaleTimeString("en-GB", {
-        timeZone: "Asia/Jakarta",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-
-      console.log('schedule time: ' + schedule.on + ' ,, ' + schedule.off + ' ,, curr time :' + currentTime)
-
-      let newState = isOn
-
-      if (
-        autoMode &&
-        (currentTime === sunTimes.sunrise || currentTime === sunTimes.sunset)
-      ) {
-        newState = true
-      } else if (currentTime === schedule.on) {
-        newState = true
-        console.log(isOn)
-      } else if (currentTime === schedule.off) {
-        newState = false
+    const fetchSunTimes = (async () => {
+      const res = await fetch(
+        "https://api.sunrise-sunset.org/json?lat=-7.250445&lng=112.768845&formatted=0"
+      )
+      const data = await res.json()
+      if (data.status === "OK") {
+        const sunrise = new Date(data.results.sunrise).toLocaleTimeString("en-GB", { 
+          timeZone: "Asia/Jakarta",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+        const sunset = new Date(data.results.sunset).toLocaleTimeString("en-GB", { 
+          timeZone: "Asia/Jakarta",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+        console.log({ sunrise, sunset })
+        setSunTimes({ sunrise, sunset })
       }
+    })()
+  }, [])
 
-      if (prevState.current !== newState) {
-        prevState.current = newState
-        setIsOn(newState)
-        publishMessage(newState ? 'ON' : 'OFF')
-      }
+  useEffect(() => {
+    if (sunTimes.sunrise && sunTimes.sunset) {
+      store(2);
     }
-    const interval = setInterval(checkTime, 1000)
-    return () => clearInterval(interval)
-  }, [schedule, sunTimes, autoMode])
+  }, [sunTimes]);
+
+  useEffect(() => {
+    if (prevAutoMode !== autoMode) {
+      store(2)
+    }
+  }, [autoMode])
+
+  useEffect(() => {
+    if (prevScheduleMode !== scheduleMode) {
+      store(3)
+    }
+  }, [scheduleMode])
 
   return (
     <div className="w-full h-screen flex flex-col items-center justify-center bg-gray-800 text-white">
@@ -110,7 +128,7 @@ function App() {
         className="w-12 h-24 bg-gray-300 rounded-full p-1 flex flex-col justify-between cursor-pointer"
         onClick={() => { 
           setIsOn(!isOn)
-          publishMessage(isOn ? 'ON' : 'OFF')  
+          store(1)
         }}
       >
         <motion.div
@@ -121,7 +139,9 @@ function App() {
           style={{ backgroundColor: isOn ? "#22c55e" : "#6b7280" }}
         />
       </motion.div>
-      <button className="mt-4 bg-blue-500 px-4 py-2 rounded" onClick={() => setAutoMode(!autoMode)}>
+      <button className="mt-4 bg-blue-500 px-4 py-2 rounded" onClick={() => {
+        setAutoMode(!autoMode)
+      }}>
         {autoMode ? "Disable Auto Mode" : "Enable Auto Mode"}
       </button>
       <button onClick={() => setShow(true)} className="mt-4 bg-green-500 px-4 py-2 rounded">
@@ -131,14 +151,16 @@ function App() {
         <ScheduleModal 
           schedule={schedule}
           setSchedule={setSchedule}
+          setScheduleMode={setScheduleMode}
           setIsModalOpen={setShow} 
+          store={store}
         />
       )}
     </div>
   )
 }
 
-const ScheduleModal = ({ schedule, setSchedule, setIsModalOpen }) => {
+const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen }) => {
   const [onTime, setOnTime] = useState(schedule.onTime || "")
   const [offTime, setOffTime] = useState(schedule.offTime || "")
 
@@ -180,9 +202,19 @@ const ScheduleModal = ({ schedule, setSchedule, setIsModalOpen }) => {
             Cancel
           </button>
           <button
+            className="px-4 py-2 bg-red-500 text-white rounded mr-2"
+            onClick={() => {
+              setSchedule({ on: '', off: '' })
+              setScheduleMode(false)
+            }}
+          >
+            Clear
+          </button>
+          <button
             className="px-4 py-2 bg-blue-500 text-white rounded"
             onClick={() => { 
               setSchedule({ on: onTime, off: offTime }) 
+              setScheduleMode(true)
               setIsModalOpen(false)
               }}
           >
