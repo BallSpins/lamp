@@ -13,6 +13,7 @@ function App() {
   const [ scheduleMode, setScheduleMode ] = useState(false)
   const [schedule, setSchedule] = useState({ on: "", off: "" })
   const [sunTimes, setSunTimes] = useState({ sunrise: "", sunset: "" })
+  const prevIsOn = useRef(isOn)
   const prevAutoMode = useRef(autoMode)
   const prevScheduleMode = useRef(scheduleMode)
 
@@ -30,6 +31,7 @@ function App() {
             let data = doc.data()
   
             console.log('Current data: ', data)
+            console.log('lamp: ', data['lampStatus'])
   
             setIsOn(data['lampStatus'])
             setAutoMode(data['autoSchedule']['status'])
@@ -109,6 +111,13 @@ function App() {
     }
   }, [sunTimes]);
 
+  useEffect(() => {
+    if (prevIsOn.current !== isOn) {
+      store(1)
+      prevIsOn.current = isOn
+    } 
+  }, [isOn])
+  
   useEffect(() => {
     if (prevAutoMode !== autoMode) {
       store(2)
