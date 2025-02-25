@@ -161,13 +161,15 @@ function App() {
 }
 
 const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen }) => {
-  const [onTime, setOnTime] = useState(schedule.onTime || "")
-  const [offTime, setOffTime] = useState(schedule.offTime || "")
+  const [onTime, setOnTime] = useState(schedule.on || "")
+  const [offTime, setOffTime] = useState(schedule.off || "")
 
   const handleSaveSchedule = () => {
     setSchedule({ onTime, offTime })
     setIsModalOpen(false)
   }
+
+  console.log(schedule.off, schedule.on)
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -206,6 +208,7 @@ const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen 
             onClick={() => {
               setSchedule({ on: '', off: '' })
               setScheduleMode(false)
+              setIsModalOpen(false)
             }}
           >
             Clear
