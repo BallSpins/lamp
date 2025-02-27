@@ -21,13 +21,13 @@ function App() {
     const auth = getAuth()
     
     signInWithEmailAndPassword(auth, "okgasokgasayokitacarigas@gmail.com", "okgasokgas")
-      .then(async (userCredential) => {
+      .then((userCredential) => {
         console.log("User logged in:", userCredential.user)
 
-        const unsub = (async () => {
+        const unsub = (() => {
           const docRef = doc(db, 'schedule', 'global')
   
-          onSnapshot(docRef, (doc) => {
+          onSnapshot(docRef, async (doc) => {
             let data = doc.data()
   
             console.log('Current data: ', data)
@@ -44,7 +44,7 @@ function App() {
         console.error("Login failed:", error.message);
       })
 
-    }, [])
+  }, [])
 
   const store = async (section) => {
     const docRef = doc(db, 'schedule', 'global')
@@ -56,13 +56,12 @@ function App() {
         break;
       case 2:
         console.log('suntime ', sunTimes)
+        console.log('auto, ', autoMode) 
         await updateDoc(docRef, {
-          autoSchedule: {
-            status: autoMode,
-            sunrise: sunTimes['sunrise'],
-            sunset: sunTimes['sunset']
-          }
+          "autoSchedule.sunrise": sunTimes['sunrise'],
+          "autoSchedule.sunset": sunTimes['sunset']
         })
+        console.log('auto, ', autoMode) 
         break;
       case 3:
         await updateDoc(docRef, {
@@ -73,15 +72,23 @@ function App() {
           }
         })
         break;
+      case 4:
+        await updateDoc(docRef, {
+          autoSchedule: {
+            status: autoMode,
+            sunrise: sunTimes['sunrise'],
+            sunset: sunTimes['sunset']
+          }
+        })
       default:
-        set(ref(db, 'schedule/global'), {
+        await updateDoc(docRef, {
           lampStatus: isOn
         })
         break;
     }
   }
 
-  // Fetch sunrise & sunset every 30 seconds
+  // Fetch sunrise & sunset
   useEffect(() => {
     const fetchSunTimes = (async () => {
       const res = await fetch(
@@ -119,14 +126,16 @@ function App() {
   }, [isOn])
   
   useEffect(() => {
-    if (prevAutoMode !== autoMode) {
-      store(2)
+    if (prevAutoMode.current !== autoMode) {
+      store(4)
+      prevAutoMode.current = autoMode
     }
   }, [autoMode])
 
   useEffect(() => {
-    if (prevScheduleMode !== scheduleMode) {
+    if (prevScheduleMode.current !== scheduleMode) {
       store(3)
+      prevScheduleMode.current = scheduleMode
     }
   }, [scheduleMode])
 
@@ -150,6 +159,7 @@ function App() {
       </motion.div>
       <button className="mt-4 bg-blue-500 px-4 py-2 rounded" onClick={() => {
         setAutoMode(!autoMode)
+        // store(2)
       }}>
         {autoMode ? "Disable Auto Mode" : "Enable Auto Mode"}
       </button>
@@ -169,7 +179,7 @@ function App() {
   )
 }
 
-const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen }) => {
+const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen, store }) => {
   const [onTime, setOnTime] = useState(schedule.on || "")
   const [offTime, setOffTime] = useState(schedule.off || "")
 
@@ -218,6 +228,7 @@ const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen 
               setSchedule({ on: '', off: '' })
               setScheduleMode(false)
               setIsModalOpen(false)
+              store(3)
             }}
           >
             Clear
@@ -228,6 +239,7 @@ const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen 
               setSchedule({ on: onTime, off: offTime }) 
               setScheduleMode(true)
               setIsModalOpen(false)
+              store(3)
               }}
           >
             Save
