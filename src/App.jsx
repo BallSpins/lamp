@@ -1,5 +1,5 @@
 import { db } from "./services/firebase"
-import { MQTTclient } from "./services/mqtt"
+// import { MQTTclient } from "./services/mqtt"
 import { doc, onSnapshot, updateDoc } from "firebase/firestore"
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
 import { useState, useEffect, useRef } from "react"
@@ -17,28 +17,28 @@ function App() {
   const prevAutoMode = useRef(autoMode)
   const prevScheduleMode = useRef(scheduleMode)
 
-  MQTTclient.on("connect", () => {
-    console.log("Connected to MQTT Broker")
+  // MQTTclient.on("connect", () => {
+  //   console.log("Connected to MQTT Broker")
   
-    // Subscribe ke topik jika perlu
-    MQTTclient.subscribe("lamp/status", (err) => {
-      if (!err) {
-        console.log("Subscribed to lamp/status")
-      }
-    })
-  })
+  //   // Subscribe ke topik jika perlu
+  //   MQTTclient.subscribe("lamp/status", (err) => {
+  //     if (!err) {
+  //       console.log("Subscribed to lamp/status")
+  //     }
+  //   })
+  // })
 
-  MQTTclient.on("message", (topic, message) => {
-    if (topic === "lamp/status") {
-      const lampStatus = message.toString() === "ON"
-      setIsOn(lampStatus)
-    }
-  })
+  // MQTTclient.on("message", (topic, message) => {
+  //   if (topic === "lamp/status") {
+  //     const lampStatus = message.toString() === "ON"
+  //     setIsOn(lampStatus)
+  //   }
+  // })
 
-  const publishLampStatus = (status) => {
-    const message = status ? "ON" : "OFF"
-    MQTTclient.publish("lamp/status", message)
-  }
+  // const publishLampStatus = (status) => {
+  //   const message = status ? "ON" : "OFF"
+  //   MQTTclient.publish("lamp/status", message)
+  // }
 
   useEffect(() => {
     const auth = getAuth()
@@ -76,7 +76,7 @@ function App() {
         await updateDoc(docRef, {
           lampStatus: isOn
         })
-        publishLampStatus(isOn)
+        // publishLampStatus(isOn)
         break;
       case 2:
         console.log('suntime ', sunTimes)
@@ -108,7 +108,7 @@ function App() {
         await updateDoc(docRef, {
           lampStatus: isOn
         })
-        publishLampStatus(isOn)
+        // publishLampStatus(isOn)  
         break;
     }
   }
