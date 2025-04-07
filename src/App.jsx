@@ -1,147 +1,21 @@
-import { db } from "./services/firebase"
-// import { MQTTclient } from "./services/mqtt"
-import { doc, onSnapshot, updateDoc } from "firebase/firestore"
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth"
-import { useState, useEffect, useRef } from "react"
-import { motion } from "framer-motion"
-import { Lightbulb } from "lucide-react"
+import { app, db } from "./services/firebase"
+import { ref, update, onValue } from "firebase/database"
+import { getAuth, signInAnonymously } from "firebase/auth"
+import { useState, useEffect, useRef } from 'react'
+import { Lightbulb } from 'lucide-react'
+import { motion } from 'framer-motion'
 
-function App() {
+export default function App() {
   const [isOn, setIsOn] = useState(false)
+  const [mode, setMode] = useState('switch')
+  const [updateInterval, setUpdateInterval] = useState(5)
+  const [scheduleMode, setScheduleMode] = useState(false)
   const [show, setShow] = useState(false)
-  const [autoMode, setAutoMode] = useState(false)
-  const [ scheduleMode, setScheduleMode ] = useState(false)
-  const [schedule, setSchedule] = useState({ on: "", off: "" })
-  const [sunTimes, setSunTimes] = useState({ sunrise: "", sunset: "" })
+  const [schedule, setSchedule] = useState({on: '', off: ''})
+
+  const [name, setName] = useState('')
   const prevIsOn = useRef(isOn)
-  const prevAutoMode = useRef(autoMode)
   const prevScheduleMode = useRef(scheduleMode)
-
-  // MQTTclient.on("connect", () => {
-  //   console.log("Connected to MQTT Broker")
-  
-  //   // Subscribe ke topik jika perlu
-  //   MQTTclient.subscribe("lamp/status", (err) => {
-  //     if (!err) {
-  //       console.log("Subscribed to lamp/status")
-  //     }
-  //   })
-  // })
-
-  // MQTTclient.on("message", (topic, message) => {
-  //   if (topic === "lamp/status") {
-  //     const lampStatus = message.toString() === "ON"
-  //     setIsOn(lampStatus)
-  //   }
-  // })
-
-  // const publishLampStatus = (status) => {
-  //   const message = status ? "ON" : "OFF"
-  //   MQTTclient.publish("lamp/status", message)
-  // }
-
-  useEffect(() => {
-    const auth = getAuth()
-    
-    signInWithEmailAndPassword(auth, "okgasokgasayokitacarigas@gmail.com", "okgasokgas")
-      .then((userCredential) => {
-        console.log("User logged in:", userCredential.user)
-
-        const unsub = (() => {
-          const docRef = doc(db, 'schedule', 'global')
-  
-          onSnapshot(docRef, async (doc) => {
-            let data = doc.data()
-  
-            console.log('Current data: ', data)
-            console.log('lamp: ', data['lampStatus'])
-  
-            setIsOn(data['lampStatus'])
-            setAutoMode(data['autoSchedule']['status'])
-            setScheduleMode(data['schedule']['status'])
-            setSchedule({ on: data['schedule']['on'], off: data['schedule']['off'] })
-          })
-        })()
-      })
-      .catch((error) => {
-        console.error("Login failed:", error.message);
-      })
-
-  }, [])
-
-  const store = async (section) => {
-    const docRef = doc(db, 'schedule', 'global')
-    switch (section) {
-      case 1:
-        await updateDoc(docRef, {
-          lampStatus: isOn
-        })
-        // publishLampStatus(isOn)
-        break;
-      case 2:
-        console.log('suntime ', sunTimes)
-        console.log('auto, ', autoMode) 
-        await updateDoc(docRef, {
-          "autoSchedule.sunrise": sunTimes['sunrise'],
-          "autoSchedule.sunset": sunTimes['sunset']
-        })
-        console.log('auto, ', autoMode) 
-        break;
-      case 3:
-        await updateDoc(docRef, {
-          schedule: {
-            status: scheduleMode,
-            on: schedule['on'],
-            off: schedule['off']
-          }
-        })
-        break;
-      case 4:
-        await updateDoc(docRef, {
-          autoSchedule: {
-            status: autoMode,
-            sunrise: sunTimes['sunrise'],
-            sunset: sunTimes['sunset']
-          }
-        })
-      default:
-        await updateDoc(docRef, {
-          lampStatus: isOn
-        })
-        // publishLampStatus(isOn)  
-        break;
-    }
-  }
-
-  // Fetch sunrise & sunset
-  useEffect(() => {
-    const fetchSunTimes = (async () => {
-      const res = await fetch(
-        "https://api.sunrise-sunset.org/json?lat=-7.250445&lng=112.768845&formatted=0"
-      )
-      const data = await res.json()
-      if (data.status === "OK") {
-        const sunrise = new Date(data.results.sunrise).toLocaleTimeString("en-GB", { 
-          timeZone: "Asia/Jakarta",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-        const sunset = new Date(data.results.sunset).toLocaleTimeString("en-GB", { 
-          timeZone: "Asia/Jakarta",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-        console.log({ sunrise, sunset })
-        setSunTimes({ sunrise, sunset })
-      }
-    })()
-  }, [])
-
-  useEffect(() => {
-    if (sunTimes.sunrise && sunTimes.sunset) {
-      store(2);
-    }
-  }, [sunTimes]);
 
   useEffect(() => {
     if (prevIsOn.current !== isOn) {
@@ -149,13 +23,6 @@ function App() {
       prevIsOn.current = isOn
     } 
   }, [isOn])
-  
-  useEffect(() => {
-    if (prevAutoMode.current !== autoMode) {
-      store(4)
-      prevAutoMode.current = autoMode
-    }
-  }, [autoMode])
 
   useEffect(() => {
     if (prevScheduleMode.current !== scheduleMode) {
@@ -164,33 +31,131 @@ function App() {
     }
   }, [scheduleMode])
 
+  useEffect(() => {
+    const dataRef = ref(db, 'lamps')
+    let unsub = () => {}
+    
+    const auth = getAuth(app)
+    signInAnonymously(auth)
+      .then(() => {
+        unsub = onValue(dataRef, (snapshot) => {
+          const data = snapshot.val()
+
+          setName(data.terrace.config.device_name)
+          setMode(data.terrace.config.mode)
+          setUpdateInterval(data.terrace.config.update_interval)
+
+          setIsOn(data.terrace.switch.state)
+          setSchedule({on: data.terrace.schedule.on, off: data.terrace.schedule.off})
+          console.log(data.terrace.config.update_interval)
+        })
+      })
+      .catch((error) => {
+        console.error('Anonymous login failed!', error.code, error.messsage)
+      })
+  
+    // return untuk cleanup (unmount)
+    return () => {
+      unsub() // matikan listener biar nggak nyampah
+    }
+  }, [])
+  
+
+  const store = async (section, payload) => {
+    switch (section) {
+      case 1:
+        await update(ref(db, 'lamps/terrace/switch'), { state: isOn })
+        break
+      case 2:
+        await update(ref(db, 'lamps/terrace/config'), { mode: payload.mode })
+      case 3:
+        await update(ref(db, 'lamps/terrace/schedule'), { on: schedule.on, off: schedule.off })
+        break
+      case 4:
+        await update(ref(db, 'lamps/terrace/config'), { update_interval: payload.update_interval })
+      default:
+        await update(ref(db, 'lamps/terrace'), { status: isOn })
+        break
+    }
+  }
+
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-center bg-gray-800 text-white">
-      <Lightbulb size={50} className={isOn ? "text-yellow-500" : "text-gray-400"} />
+    <div className='w-full min-h-screen bg-gradient-to-br from-[#0f0f0f] via-[#1a1a1a] to-[#0f0f0f] text-white font-sans px-4 py-8 flex flex-col items-center justify-center'>      
+      <div className='mb-6 text-center'>
+        <span className='text-gray-400'>Device:</span>
+        <span className='ml-2 text-emerald-400 uppercase font-semibold tracking-wide'>{name}</span>
+      </div>
+
+      <div className='mb-6 text-center'>
+        <span className='text-gray-400'>Mode saat ini:</span>
+        <span className='ml-2 text-emerald-400 uppercase font-semibold tracking-wide'>{mode}</span>
+      </div>
+
+      <button 
+        onClick={() => {
+          const newMode = mode === 'switch' ? 'schedule' : 'switch'
+          setMode(newMode)
+          store(2, { mode: newMode })
+        }} 
+        className='mb-8 px-8 py-3 rounded-full bg-gradient-to-r from-indigo-600 to-blue-500 hover:brightness-125 transition-all shadow-lg'
+      >
+        🔁 Ganti Mode
+      </button>
+
+      <div className='bg-white/5 backdrop-blur-md rounded-2xl p-6 w-full max-w-md mb-10 shadow-xl border border-white/10'>
+        <label className='block text-sm mb-2 text-gray-300'>
+          Update Interval (milidetik)
+        </label>
+        <input
+          type='number'
+          min='1'
+          className='border-none w-full px-4 py-2 rounded-xl text-gray-500'
+          value={updateInterval}
+          onChange={(e) => setUpdateInterval(e.target.value)}
+        />
+        <button
+          className='mt-4 w-full bg-yellow-400 hover:bg-yellow-300 text-black py-2 rounded-xl font-semibold transition'
+          onClick={() => {
+            const intervalS = parseInt(updateInterval)
+            if (!isNaN(intervalS) && intervalS > 0) {
+              store(4, { update_interval: intervalS })
+            } else {
+              alert('Masukkan interval yang valid!')
+            }
+          }}
+        >
+          💾 Simpan Interval
+        </button>
+      </div>
+
+      <Lightbulb size={80} className={isOn ? 'text-yellow-400 drop-shadow-xl' : 'text-gray-500 opacity-60'} />
+
       <motion.div
-        className="w-12 h-24 bg-gray-300 rounded-full p-1 flex flex-col justify-between cursor-pointer"
-        onClick={() => { 
-          setIsOn(!isOn)
-          store(1)
+        className={`w-16 h-32 rounded-full p-1 flex flex-col justify-between mt-6 cursor-pointer border-2 ${mode === 'schedule' ? 'bg-gray-800 border-gray-600 cursor-not-allowed' : 'bg-gradient-to-br from-slate-300 to-gray-400 border-white/30'}`}
+        onClick={() => {
+          if (mode === 'switch') {
+            setIsOn(!isOn)
+            store(1)
+          }
         }}
       >
         <motion.div
-          className="w-10 h-10 bg-white rounded-full shadow-lg"
+          className='w-14 h-14 bg-white rounded-full shadow-2xl'
           initial={false}
-          animate={{ y: isOn ? 0 : 56 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          style={{ backgroundColor: isOn ? "#22c55e" : "#6b7280" }}
+          animate={{ y: isOn ? 0 : 72 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          style={{ backgroundColor: isOn ? '#facc15' : '#6b7280' }}
         />
       </motion.div>
-      <button className="mt-4 bg-blue-500 px-4 py-2 rounded" onClick={() => {
-        setAutoMode(!autoMode)
-        // store(2)
-      }}>
-        {autoMode ? "Disable Auto Mode" : "Enable Auto Mode"}
+
+      <button 
+        onClick={() => setShow(true)} 
+        disabled={mode === 'switch'} 
+        className='mt-8 px-8 py-3 bg-gradient-to-r from-teal-400 to-green-500 text-black font-medium rounded-full hover:brightness-110 transition disabled:opacity-50'
+      >
+        🕒 Jadwalkan
       </button>
-      <button onClick={() => setShow(true)} className="mt-4 bg-green-500 px-4 py-2 rounded">
-        Set Schedule
-      </button>
+
       {show && (
         <ScheduleModal 
           schedule={schedule}
@@ -248,17 +213,6 @@ const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen,
             Cancel
           </button>
           <button
-            className="px-4 py-2 bg-red-500 text-white rounded mr-2"
-            onClick={() => {
-              setSchedule({ on: '', off: '' })
-              setScheduleMode(false)
-              setIsModalOpen(false)
-              store(3)
-            }}
-          >
-            Clear
-          </button>
-          <button
             className="px-4 py-2 bg-blue-500 text-white rounded"
             onClick={() => { 
               setSchedule({ on: onTime, off: offTime }) 
@@ -274,5 +228,3 @@ const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen,
     </div>
   )
 }
-
-export default App

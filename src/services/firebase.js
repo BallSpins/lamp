@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app"
-import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_REACT_APP_FIREBASE_API_KEY,
@@ -12,7 +12,7 @@ const firebaseConfig = {
   databaseURL: import.meta.env.VITE_REACT_APP_FIREBASE_DATABASE_URL
 };
 
-const firestore = initializeApp(firebaseConfig)
-const db = getFirestore(firestore)
+const app = initializeApp(firebaseConfig)
+const db = getDatabase()
 
-export { firestore, db }
+export { app, db }
