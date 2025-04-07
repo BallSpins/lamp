@@ -17,6 +17,9 @@ export default function App() {
   const prevIsOn = useRef(isOn)
   const prevScheduleMode = useRef(scheduleMode)
 
+  const [authorized, setAuthorized] = useState(false)
+  const [inputPassword, setInputPassword] = useState("")
+
   useEffect(() => {
     if (prevIsOn.current !== isOn) {
       store(1)
@@ -79,6 +82,35 @@ export default function App() {
     }
   }
 
+  if (!authorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white p-6">
+        <div className="bg-white/10 backdrop-blur-md p-8 rounded-2xl max-w-sm w-full shadow-lg">
+          <h2 className="text-lg font-semibold mb-4">🔐 Masukkan Password</h2>
+          <input 
+            type="password" 
+            value={inputPassword}
+            onChange={(e) => setInputPassword(e.target.value)}
+            className="w-full p-2 mb-4 rounded text-black"
+            placeholder="Password"
+          />
+          <button 
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white p-2 rounded"
+            onClick={() => {
+              if (inputPassword === import.meta.env.VITE_LAMP_PASSWORD) {
+                setAuthorized(true)
+              } else {
+                alert("Password salah, coba lagi ya 😬")
+              }
+            }}
+          >
+            🔓 Masuk
+          </button>
+        </div>
+      </div>
+    )
+  }  
+
   return (
     <div className='w-full min-h-screen bg-gradient-to-br from-[#0f0f0f] via-[#1a1a1a] to-[#0f0f0f] text-white font-sans px-4 py-8 flex flex-col items-center justify-center'>      
       <div className='mb-6 text-center'>
@@ -93,6 +125,7 @@ export default function App() {
 
       <button 
         onClick={() => {
+          if (!authorized) return
           const newMode = mode === 'switch' ? 'schedule' : 'switch'
           setMode(newMode)
           store(2, { mode: newMode })
@@ -133,6 +166,7 @@ export default function App() {
       <motion.div
         className={`w-16 h-32 rounded-full p-1 flex flex-col justify-between mt-6 cursor-pointer border-2 ${mode === 'schedule' ? 'bg-gray-800 border-gray-600 cursor-not-allowed' : 'bg-gradient-to-br from-slate-300 to-gray-400 border-white/30'}`}
         onClick={() => {
+          if (!authorized) return
           if (mode === 'switch') {
             setIsOn(!isOn)
             store(1)
@@ -228,3 +262,4 @@ const ScheduleModal = ({ schedule, setSchedule, setScheduleMode, setIsModalOpen,
     </div>
   )
 }
+
