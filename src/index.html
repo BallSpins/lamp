@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100 dark:bg-gray-900">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Lampu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;     /* Firefox */
+    }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center">
+  <div class="bg-white dark:bg-gray-800 shadow-xl rounded-2xl w-full max-w-md p-6 space-y-6">
+    <h1 class="text-2xl font-bold text-center text-gray-800 dark:text-white">Dashboard Lampu</h1>
+
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg shadow-sm">
+        <p class="text-gray-500 dark:text-gray-300">Data Sensor</p>
+        <p class="text-lg font-semibold text-blue-600 dark:text-blue-400" id="sensor">Loading...</p>
+      </div>
+      <div class="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg shadow-sm">
+        <p class="text-gray-500 dark:text-gray-300">Status Lampu</p>
+        <p class="text-lg font-semibold text-yellow-600 dark:text-yellow-400" id="lampu-status1">Loading...</p>
+      </div>
+      <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg shadow-sm">
+        <p class="text-gray-500 dark:text-gray-300">Config Jadwal</p>
+        <p class="text-sm text-green-600 dark:text-green-400" id="jadwal">07:00 - 17:30</p>
+      </div>
+      <div class="bg-purple-50 dark:bg-purple-900 p-4 rounded-lg shadow-sm">
+        <p class="text-gray-500 dark:text-gray-300">Mode Otomatis</p>
+        <p class="text-sm text-purple-600 dark:text-purple-400" id="mode">Aktif</p>
+      </div>
+      <div class="col-span-2 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm">
+        <p class="text-gray-500 dark:text-gray-300">Log Aktivitas</p>
+        <div class="text-sm text-gray-700 dark:text-gray-300 h-20 overflow-y-auto mt-2 scrollbar-hide">
+          <ul id="log"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Toggle -->
+    <div class="mt-6">
+      <label for="mode-toggle" class="text-gray-700 dark:text-gray-200 font-semibold">Pilih Mode</label>
+      <select id="mode-toggle" class="w-full mt-2 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+        <option value="switch" selected>Switch</option>
+        <option value="schedule">Jadwal</option>
+      </select>
+    </div>
+
+    <!-- Lampu Switch / Schedule Input -->
+    <div id="switch-mode" class="mt-6">
+      <label for="lampu-toggle" class="text-gray-700 dark:text-gray-200 font-semibold">Kontrol Lampu</label>
+      <div class="flex items-center mt-2">
+        <input type="checkbox" id="lampu-toggle" class="toggle-switch" />
+        <span id="lampu-status2" class="ml-2 text-sm text-gray-500 dark:text-gray-300">Lampu Mati</span>
+      </div>
+    </div>
+    
+    <div id="schedule-mode" class="mt-6 hidden">
+      <label for="schedule-time" class="text-gray-700 dark:text-gray-200 font-semibold">Set Jadwal</label>
+      <div class="grid grid-cols-2 gap-4 mt-2">
+        <input type="time" id="schedule-on" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+        <input type="time" id="schedule-off" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700" />
+    </div>
+</div>
+
+</div>
+
+<script>
+    // Toggle untuk Mode Switch dan Schedule
+    const modeToggle = document.getElementById('mode-toggle')
+    const switchMode = document.getElementById('switch-mode')
+    const scheduleMode = document.getElementById('schedule-mode')
+    
+    // Toggler Lampu
+    const lampuToggle = document.getElementById('lampu-toggle')
+    const lampuStatus1 = document.getElementById('lampu-status1')
+    const lampuStatus2 = document.getElementById('lampu-status2')
+    
+    // Set Jadwal
+    const schedule = document.getElementById('jadwal')
+    const scheduleOn = document.getElementById('schedule-on')
+    const scheduleOff = document.getElementById('schedule-off')
+
+    const log = document.getElementById('log')
+
+    const lampsource = new EventSource("/lamp_config/realtime")
+    const DHTsource = new EventSource("/dht_data/realtime")
+    const logsource = new EventSource("/logs/realtime")
+
+    let lampdata
+    let DHTdata
+    let logdata = []
+
+    
+    DHTsource.onmessage = (event) => {
+      DHTdata = JSON.parse(event.data)
+      console.log("Data received:", DHTdata)
+
+      document.getElementById('sensor').textContent = `${DHTdata?.temperature}°C / ${DHTdata?.humidity}%` || '0°C / 0%'
+    }
+    
+    lampsource.onmessage = (event) => {
+        lampdata = JSON.parse(event.data)
+        console.log("Data received:", lampdata)
+        console.log(lampdata.manual_state)
+
+        lampuToggle.checked = lampdata.manual_state
+        lampuStatus1.textContent = lampdata.manual_state ? 'Lampu menyala' : 'Lampu mati' 
+        lampuStatus2.textContent = lampdata.manual_state ? 'Lampu menyala' : 'Lampu mati' 
+
+        modeToggle.value = lampdata.mode === 'schedule' ? 'schedule' : 'switch'
+        mode.textContent = lampdata.mode == 'schedule' ? 'Aktif' : 'Non-Aktif'
+        if (lampdata.mode === 'schedule') {
+            switchMode.classList.add('hidden')
+            scheduleMode.classList.remove('hidden')
+        } else {
+            switchMode.classList.remove('hidden')
+            scheduleMode.classList.add('hidden')
+        }
+
+        schedule.textContent = `${lampdata.on} - ${lampdata.off}`
+        scheduleOn.value = lampdata.on
+        scheduleOff.value = lampdata.off
+    }
+
+    logsource.onmessage = (event) => {
+      // console.log(event.data)
+      const data = JSON.parse(event.data)
+      // console.log(data)
+
+      logdata.splice(0)
+      data.logs.forEach(d => {
+        logdata.push(d)
+      })
+      // console.log(event.data)
+      console.log(logdata)
+
+      log.innerHTML = ''
+      logdata.forEach(l => {
+        const li = document.createElement('li')
+        const textli = document.createTextNode(l)
+        li.textContent = l
+        log.appendChild(li)
+      })
+    }
+
+    modeToggle.addEventListener('change', () => {
+      if (modeToggle.value === 'switch') {
+        switchMode.classList.remove('hidden')
+        scheduleMode.classList.add('hidden')
+        sendRequest('POST', '/update', { mode: 'switch' })
+    } else {
+        switchMode.classList.add('hidden')
+        scheduleMode.classList.remove('hidden')
+        sendRequest('POST', '/update', { mode: 'schedule' })
+      }
+    })
+
+    lampuToggle.addEventListener('change', () => {
+      if (lampuToggle.checked) {
+        lampuStatus.classList.add('text-yellow-600')
+        lampuStatus.classList.remove('text-gray-500')
+        sendRequest('POST', '/update', { manual_state: true })
+      } else {
+        lampuStatus.classList.remove('text-yellow-600')
+        lampuStatus.classList.add('text-gray-500')
+        sendRequest('POST', '/update', { manual_state: false })
+      }
+    })
+
+    scheduleOn.addEventListener('change', () => {
+      sendRequest('POST', '/update', { on: scheduleOn.value, off: scheduleOff.value })
+    })
+
+    scheduleOff.addEventListener('change', () => {
+      sendRequest('POST', '/update', { on: scheduleOn.value, off: scheduleOff.value })
+    })
+
+    // Fungsi untuk mengirim request axios
+    function sendRequest(method, url, data) {
+      axios({
+        method: method,
+        url: url,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        data: data,
+      })
+      .then((response) => {
+        console.log('Response:', response.data)
+        // Bisa menambahkan logika lain setelah berhasil
+      })
+      .catch((error) => {
+        console.error('Error:', error)
+        // Bisa menambahkan penanganan error
+      })
+    }
+  </script>
+</body>
+</html>
