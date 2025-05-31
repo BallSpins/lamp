@@ -1,4 +1,5 @@
 #include "dhtHandler.h"
+#include "logHandler.h"
 
 DHT dht(DHT_PIN, DHT_TYPE);
 
@@ -18,6 +19,10 @@ ICACHE_FLASH_ATTR void getDHT() {
         snprintf(payload, sizeof(payload), "{\"h\":%d,\"t\":%d}", humid, temp);
 
         client.publish("dht", payload);
-      } 
+
+        logs("DHT data sent successfully", "INFO");
+      } else {
+        logs("Failed to read from DHT sensor", "WARNING");
+      }
     }
 }

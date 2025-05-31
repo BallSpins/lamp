@@ -66,7 +66,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
   if (doc.containsKey("m")) {
     manual = (doc["m"].is<int>() == 1);
-    if (!manual) schedule(state, schedule_on, schedule_off);
+    if (!manual) schedule(&state, schedule_on, schedule_off);
   }
 
   // If 's' exists, update lamp state immediately
@@ -108,7 +108,7 @@ void loop() {
     lastSync = millis();
   }
   
-  if (!manual) schedule(state, schedule_on, schedule_off);
+  if (!manual) schedule(&state, schedule_on, schedule_off);
 
   digitalWrite(LED_PIN, state ? LOW : HIGH);
 

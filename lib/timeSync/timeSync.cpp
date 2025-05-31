@@ -1,4 +1,5 @@
 #include "timeSync.h"
+#include "logHandler.h"
 
 // NTP
 WiFiUDP ntpUDP;
@@ -12,10 +13,13 @@ ICACHE_FLASH_ATTR void ntpSyncOnce() {
     if (timeClient.update()) {
       syncedEpoch = timeClient.getEpochTime();
       lastMillis = millis();
+      logs("NTP time sync successful", "INFO");
       return;
     }
     delay(5000);  // Wait 5 seconds before retrying
   }
+
+  logs("NTP time sync failed after 5 attempts", "WARNING");
 }
 
 ICACHE_FLASH_ATTR unsigned long getCurrentEpoch() {
